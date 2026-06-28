@@ -1,0 +1,6 @@
+{
+  "name": "Git Graph Components",
+  "description": "A beautiful, interactive, and customizable Git graph rendering system and sandbox built as modular React components styled with Tailwind CSS.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
