@@ -10,17 +10,22 @@ import {
   addLabel,
   EXAMPLES,
 } from "./lib/execution-engine";
+import { ConversationView } from "./components/conversation-view";
 import {
   Zap,
   Sparkles,
   Network,
   Copy,
   Check,
+  MessageSquare,
 } from "lucide-react";
+
+type AppView = "playground" | "conversation";
 
 const LOCAL_STORAGE_KEY = "mini-graph-execution-state";
 
 export default function App() {
+  const [view, setView] = useState<AppView>("playground");
   const [state, setState] = useState<ExecutionState>(() => {
     const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (saved) {
@@ -116,6 +121,32 @@ export default function App() {
             </div>
           </div>
 
+          {/* View tabs */}
+          <div className="flex items-center gap-1 p-1 rounded-lg bg-zinc-900/80 border border-zinc-800/60">
+            <button
+              onClick={() => setView("playground")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                view === "playground"
+                  ? "bg-zinc-700 text-zinc-100"
+                  : "text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              <Network size={12} />
+              Playground
+            </button>
+            <button
+              onClick={() => setView("conversation")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                view === "conversation"
+                  ? "bg-zinc-700 text-zinc-100"
+                  : "text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              <MessageSquare size={12} />
+              Conversation
+            </button>
+          </div>
+
           {/* Install snippet + stats */}
           <div className="flex items-center gap-3 text-xs font-mono">
             {/* Install snippet */}
@@ -162,31 +193,37 @@ export default function App() {
       </header>
 
       {/* Main workspace */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-0">
-        {/* Sidebar */}
-        <div className="lg:col-span-4 flex flex-col min-h-[400px] lg:h-[calc(100vh-140px)] sticky top-24">
-          <ExecutionControls
-            state={state}
-            options={layoutOptions}
-            onOptionsChange={setLayoutOptions}
-            onAddStep={handleAddStep}
-            onForkFromCurrentHead={handleForkFromCurrentHead}
-            onLoadExample={handleLoadExample}
-            onReset={handleReset}
-          />
-        </div>
+      {view === "playground" ? (
+        <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-0">
+          {/* Sidebar */}
+          <div className="lg:col-span-4 flex flex-col min-h-[400px] lg:h-[calc(100vh-140px)] sticky top-24">
+            <ExecutionControls
+              state={state}
+              options={layoutOptions}
+              onOptionsChange={setLayoutOptions}
+              onAddStep={handleAddStep}
+              onForkFromCurrentHead={handleForkFromCurrentHead}
+              onLoadExample={handleLoadExample}
+              onReset={handleReset}
+            />
+          </div>
 
-        {/* Canvas */}
-        <div className="lg:col-span-8 flex flex-col lg:h-[calc(100vh-140px)] min-h-[400px]">
-          <ExecutionCanvas
-            state={state}
-            options={layoutOptions}
-            onForkFromStep={handleForkRun}
-            onSetCursorToRun={handleSwitchRun}
-            onAddLabel={handleAddLabel}
-          />
-        </div>
-      </main>
+          {/* Canvas */}
+          <div className="lg:col-span-8 flex flex-col lg:h-[calc(100vh-140px)] min-h-[400px]">
+            <ExecutionCanvas
+              state={state}
+              options={layoutOptions}
+              onForkFromStep={handleForkRun}
+              onSetCursorToRun={handleSwitchRun}
+              onAddLabel={handleAddLabel}
+            />
+          </div>
+        </main>
+      ) : (
+        <main className="flex flex-1 min-h-0 w-4/5 mx-auto overflow-hidden" style={{ height: "calc(100vh - 73px)" }}>
+          <ConversationView />
+        </main>
+      )}
     </div>
   );
 }

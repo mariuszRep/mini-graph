@@ -25,6 +25,7 @@ interface ExecutionCanvasProps {
   onForkFromStep: (fromStepId: string, runName: string) => void;
   onSetCursorToRun: (runId: string) => void;
   onAddLabel: (label: string, stepId: string) => void;
+  minimal?: boolean;
 }
 
 export const ExecutionCanvas: React.FC<ExecutionCanvasProps> = ({
@@ -33,6 +34,7 @@ export const ExecutionCanvas: React.FC<ExecutionCanvasProps> = ({
   onForkFromStep,
   onSetCursorToRun,
   onAddLabel,
+  minimal = false,
 }) => {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -225,11 +227,13 @@ export const ExecutionCanvas: React.FC<ExecutionCanvasProps> = ({
                   <div style={{ width: `${spacerWidth}px` }} className="shrink-0 h-full" />
 
                   <div className="flex-1 min-w-0 flex items-center gap-2.5 pr-4">
-                    <span className="font-mono text-[11px] text-zinc-500 bg-zinc-950 px-1.5 py-0.5 rounded border border-zinc-900/80 shrink-0">
-                      {s.id.slice(0, 7)}
-                    </span>
-                    <StepBadge type={s.step.type} />
-                    <span className="font-medium text-zinc-100 text-xs truncate">{s.step.content}</span>
+                    {!minimal && (
+                      <span className="font-mono text-[11px] text-zinc-500 bg-zinc-950 px-1.5 py-0.5 rounded border border-zinc-900/80 shrink-0">
+                        {s.id.slice(0, 7)}
+                      </span>
+                    )}
+                    {!minimal && <StepBadge type={s.step.type} />}
+                    <span className="font-medium text-zinc-100 text-xs whitespace-pre-wrap break-words">{s.step.content}</span>
                     {showLabels && s.step.labels.length > 0 && (
                       <div className="flex items-center gap-1.5 shrink-0">
                         {s.step.labels.map((lbl, i) => (
@@ -242,21 +246,23 @@ export const ExecutionCanvas: React.FC<ExecutionCanvasProps> = ({
                     )}
                   </div>
 
-                  <div className="flex items-center gap-4 shrink-0 text-xs">
-                    {s.step.author && (
-                      <span className="text-zinc-500 text-[11px] font-medium hidden sm:inline">{s.step.author}</span>
-                    )}
-                    <span className="text-zinc-600 text-[11px] font-mono whitespace-nowrap">
-                      {new Date(s.step.timestamp).toLocaleDateString([], { month: "short", day: "numeric" })}
-                    </span>
-                    <button
-                      onClick={(e) => handleCopyId(s.id, e)}
-                      className="p-1 rounded text-zinc-600 hover:text-zinc-200 hover:bg-zinc-800/50 opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
-                      title="Copy step id"
-                    >
-                      {copiedId === s.id ? <span className="text-[10px]">✓</span> : <Copy size={12} />}
-                    </button>
-                  </div>
+                  {!minimal && (
+                    <div className="flex items-center gap-4 shrink-0 text-xs">
+                      {s.step.author && (
+                        <span className="text-zinc-500 text-[11px] font-medium hidden sm:inline">{s.step.author}</span>
+                      )}
+                      <span className="text-zinc-600 text-[11px] font-mono whitespace-nowrap">
+                        {new Date(s.step.timestamp).toLocaleDateString([], { month: "short", day: "numeric" })}
+                      </span>
+                      <button
+                        onClick={(e) => handleCopyId(s.id, e)}
+                        className="p-1 rounded text-zinc-600 hover:text-zinc-200 hover:bg-zinc-800/50 opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                        title="Copy step id"
+                      >
+                        {copiedId === s.id ? <span className="text-[10px]">✓</span> : <Copy size={12} />}
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "graph-feed",
+  "type": "registry:component",
+  "title": "Graph Feed",
+  "description": "Primitive component for rendering a vertical graph (nodes + edges) with an open content slot per row. Use it for chat, git history, workflow lineage, or any sequential/branching data.",
+  "dependencies": [],
+  "registryDependencies": ["utils"],
+  "cssVars": {
+    "theme": {
+      "--chart-1": "220 70% 60%",
+      "--chart-2": "160 60% 45%",
+      "--chart-3": "280 65% 65%",
+      "--chart-4": "38 95% 55%",
+      "--chart-5": "340 75% 55%",
+      "--chart-6": "200 85% 50%",
+      "--chart-7": "0 72% 51%",
+      "--chart-8": "175 70% 45%"
+    }
+  },
+  "files": [
+    {
+      "path": "components/ui/graph-feed.tsx",
+      "type": "registry:component"
+    }
+  ]
+}
