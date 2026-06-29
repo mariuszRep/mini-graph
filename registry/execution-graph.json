@@ -1,0 +1,58 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "execution-graph",
+  "type": "registry:component",
+  "title": "Execution Graph",
+  "description": "Workflow and agent execution trace visualizer with forking/merging lane support. shadcn/ui-compatible, Tailwind CSS v3/v4, Motion animations.",
+  "dependencies": [
+    "motion",
+    "lucide-react"
+  ],
+  "registryDependencies": [],
+  "cssVars": {
+    "theme": {
+      "--chart-1": "220 70% 60%",
+      "--chart-2": "160 60% 45%",
+      "--chart-3": "280 65% 65%",
+      "--chart-4": "38 95% 55%",
+      "--chart-5": "340 75% 55%",
+      "--chart-6": "200 85% 50%",
+      "--chart-7": "0 72% 51%",
+      "--chart-8": "175 70% 45%"
+    }
+  },
+  "files": [
+    {
+      "path": "components/execution-graph/index.tsx",
+      "type": "registry:component"
+    },
+    {
+      "path": "components/execution-graph/canvas.tsx",
+      "type": "registry:component"
+    },
+    {
+      "path": "components/execution-graph/controls.tsx",
+      "type": "registry:component"
+    },
+    {
+      "path": "components/execution-graph/step-badge.tsx",
+      "type": "registry:component"
+    },
+    {
+      "path": "lib/execution-engine.ts",
+      "type": "registry:lib"
+    },
+    {
+      "path": "lib/graph-layout.ts",
+      "type": "registry:lib"
+    },
+    {
+      "path": "lib/types.ts",
+      "type": "registry:lib"
+    },
+    {
+      "path": "lib/utils.ts",
+      "type": "registry:lib"
+    }
+  ]
+}

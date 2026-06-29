@@ -1,6 +1,18 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
+/* shadcn/ui-compatible chart CSS variables used by the execution graph */
+:root {
+  --chart-1: 220 70% 60%;   /* blue — primary run color */
+  --chart-2: 160 60% 45%;   /* emerald */
+  --chart-3: 280 65% 65%;   /* violet */
+  --chart-4: 38 95% 55%;    /* amber — reserved for "user" step type */
+  --chart-5: 340 75% 55%;   /* pink */
+  --chart-6: 200 85% 50%;   /* cyan */
+  --chart-7: 0 72% 51%;     /* red */
+  --chart-8: 175 70% 45%;   /* teal */
+}
+
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Space Grotesk", sans-serif;
