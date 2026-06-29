@@ -5,9 +5,7 @@ import {
   addStep,
   forkRun,
   switchRun,
-  mergeRuns,
   addLabel,
-  deleteRun,
 } from "../../lib/execution-engine";
 import { ExecutionCanvas } from "./canvas";
 import { ExecutionControls } from "./controls";
@@ -29,6 +27,7 @@ const DEFAULT_OPTIONS: LayoutOptions = {
   columnWidth: 16,
   nodeRadius: 4,
   lineWidth: 2,
+  nodeHeaderHeight: 24,
   showLabels: true,
   showComments: true,
   theme: "github",
@@ -68,23 +67,21 @@ export const ExecutionGraph: React.FC<ExecutionGraphProps> = ({
     if (!result.error) dispatch(result.state);
   };
 
+  const handleForkFromCurrentHead = (runName: string) => {
+    const head = state.runs[state.cursor]?.head;
+    if (head) {
+      const result = forkRun(state, head, runName);
+      if (!result.error) dispatch(result.state);
+    }
+  };
+
   const handleSwitchRun = (runId: string) => {
     const result = switchRun(state, runId);
     if (!result.error) dispatch(result.state);
   };
 
-  const handleMergeRuns = (sourceRunId: string) => {
-    const result = mergeRuns(state, sourceRunId);
-    if (!result.error) dispatch(result.state);
-  };
-
   const handleAddLabel = (label: string, stepId: string) => {
     const result = addLabel(state, label, stepId);
-    if (!result.error) dispatch(result.state);
-  };
-
-  const handleDeleteRun = (runId: string) => {
-    const result = deleteRun(state, runId);
     if (!result.error) dispatch(result.state);
   };
 
@@ -97,10 +94,7 @@ export const ExecutionGraph: React.FC<ExecutionGraphProps> = ({
             options={options}
             onOptionsChange={setOptions}
             onAddStep={handleAddStep}
-            onForkRun={handleForkRun}
-            onSwitchRun={handleSwitchRun}
-            onMergeRuns={handleMergeRuns}
-            onDeleteRun={handleDeleteRun}
+            onForkFromCurrentHead={handleForkFromCurrentHead}
             onLoadExample={() => {}}
             onReset={() => dispatch(createInitialState())}
           />

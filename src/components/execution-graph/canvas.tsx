@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from "motion/react";
 import { ExecutionState, LayoutOptions } from "../../lib/types";
 import { computeLayout } from "../../lib/graph-layout";
 import { StepBadge } from "./step-badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   ChevronDown,
   Target,
@@ -11,8 +13,7 @@ import {
   RefreshCw,
   MoreHorizontal,
   Copy,
-  GitFork,
-  Plus,
+  GitBranch,
   Tag,
   Zap,
   X,
@@ -35,7 +36,8 @@ export const ExecutionCanvas: React.FC<ExecutionCanvasProps> = ({
 }) => {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [forkName, setForkName] = useState("");
+  const [branchName, setBranchName] = useState("");
+  const [showBranchInput, setShowBranchInput] = useState(false);
   const [newLabel, setNewLabel] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -43,23 +45,12 @@ export const ExecutionCanvas: React.FC<ExecutionCanvasProps> = ({
   const { rowHeight, nodeRadius, lineWidth, showLabels } = options;
   const spacerWidth = Math.max(layout.width - 80, 40);
 
-  // Resolve which run ID a step belongs to, and whether it's that run's head
-  const getStepRefs = (stepId: string) => {
+  const getStepRun = (stepId: string) => {
     const step = state.steps[stepId];
-    if (!step) return { runName: "", runColor: "", isHead: false, isCursor: false };
-
-    const run = state.runs[step.runId];
-    const isHead = run?.head === stepId;
-    const isCursor = state.cursor === step.runId && isHead;
-
-    return {
-      runName: run?.name ?? "",
-      runColor: run?.color ?? "#9CA3AF",
-      isHead,
-      isCursor,
-      runId: step.runId,
-    };
+    if (!step) return null;
+    return state.runs[step.runId] ?? null;
   };
+
 
   const handleCopyId = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -68,11 +59,22 @@ export const ExecutionCanvas: React.FC<ExecutionCanvasProps> = ({
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handleFork = () => {
-    if (!selectedId || !forkName.trim()) return;
-    onForkFromStep(selectedId, forkName.trim());
+  const handleRowClick = (stepId: string) => {
+    const step = state.steps[stepId];
+    if (!step) return;
+    // Immediately activate this step's node (run)
+    onSetCursorToRun(step.runId);
+    setSelectedId(selectedId === stepId ? null : stepId);
+    setShowBranchInput(false);
+    setBranchName("");
+  };
+
+  const handleBranch = () => {
+    if (!selectedId || !branchName.trim()) return;
+    onForkFromStep(selectedId, branchName.trim());
     setSelectedId(null);
-    setForkName("");
+    setBranchName("");
+    setShowBranchInput(false);
   };
 
   const handleAddLabel = () => {
@@ -81,14 +83,11 @@ export const ExecutionCanvas: React.FC<ExecutionCanvasProps> = ({
     setNewLabel("");
   };
 
-  const handleSetActive = () => {
-    if (!selectedId) return;
-    const step = state.steps[selectedId];
-    if (!step) return;
-    const run = state.runs[step.runId];
-    if (run?.head === selectedId) {
-      onSetCursorToRun(step.runId);
-    }
+  const handleClosePanel = () => {
+    setSelectedId(null);
+    setBranchName("");
+    setNewLabel("");
+    setShowBranchInput(false);
   };
 
   return (
@@ -135,8 +134,7 @@ export const ExecutionCanvas: React.FC<ExecutionCanvasProps> = ({
               {/* Paths */}
               <g>
                 {layout.paths.map((p) => {
-                  // Incoming to selected dot (path id = "${parentId}-${childId}-${idx}", selected is child)
-                  const isSelectedOutgoing = !!selectedId && p.id.includes('-' + selectedId + '-');
+                  const isHighlighted = !!selectedId && p.id.includes('-' + selectedId + '-');
                   const isHovered = !!hoveredId && p.id.includes(hoveredId);
                   return (
                     <motion.path
@@ -144,9 +142,9 @@ export const ExecutionCanvas: React.FC<ExecutionCanvasProps> = ({
                       d={p.d}
                       fill="none"
                       stroke={p.color}
-                      strokeWidth={isSelectedOutgoing ? lineWidth + 2.5 : isHovered ? lineWidth + 1 : lineWidth}
+                      strokeWidth={isHighlighted ? lineWidth + 2.5 : isHovered ? lineWidth + 1 : lineWidth}
                       strokeLinecap="round"
-                      opacity={isSelectedOutgoing ? 1.0 : isHovered ? 0.9 : 0.55}
+                      opacity={isHighlighted ? 1.0 : isHovered ? 0.9 : 0.55}
                       initial={{ pathLength: 0 }}
                       animate={{ pathLength: 1 }}
                       transition={{ duration: 0.4 }}
@@ -162,7 +160,6 @@ export const ExecutionCanvas: React.FC<ExecutionCanvasProps> = ({
                   const isSelected = selectedId === s.id;
                   return (
                     <g key={`node-${s.id}`}>
-                      {/* Cursor pulse ring */}
                       {s.isCursor && (
                         <motion.circle
                           cx={s.x}
@@ -175,8 +172,6 @@ export const ExecutionCanvas: React.FC<ExecutionCanvasProps> = ({
                           transition={{ repeat: Infinity, duration: 1.8, ease: "easeInOut" }}
                         />
                       )}
-
-                      {/* Hover / selection ring */}
                       {(isHovered || isSelected) && (
                         <circle
                           cx={s.x}
@@ -188,8 +183,6 @@ export const ExecutionCanvas: React.FC<ExecutionCanvasProps> = ({
                           opacity={isSelected ? 0.9 : 0.5}
                         />
                       )}
-
-                      {/* Main dot */}
                       <circle
                         cx={s.x}
                         cy={s.y}
@@ -211,92 +204,50 @@ export const ExecutionCanvas: React.FC<ExecutionCanvasProps> = ({
           {/* Row list */}
           <div className="absolute inset-0 flex flex-col z-10">
             {layout.steps.map((s) => {
-              const refs = getStepRefs(s.id);
+              const run = getStepRun(s.id);
+              const runColor = run?.color ?? "#9CA3AF";
               const isHovered = hoveredId === s.id;
               const isSelected = selectedId === s.id;
-              const stepLabels = s.step.labels ?? [];
 
               return (
                 <div
-                  key={`row-${s.id}`}
-                  style={{ height: `${rowHeight}px` }}
-                  className={`group flex items-center justify-between px-4 border-b border-zinc-900/40 cursor-default transition-all duration-150 ${
-                    isSelected
-                      ? "bg-indigo-500/5 text-white border-l-2 border-l-indigo-500"
-                      : isHovered
-                      ? "bg-zinc-900/80 text-white"
-                      : "text-zinc-300 hover:bg-zinc-900/40"
+                  key={s.id}
+                  style={{ height: `${rowHeight}px`, borderLeft: `3px solid ${runColor}20` }}
+                  className={`group flex items-center justify-between px-4 border-b border-zinc-900/40 cursor-default transition-all duration-150 shrink-0 ${
+                    isSelected ? "bg-indigo-500/5 text-white"
+                    : isHovered ? "bg-zinc-900/80 text-white"
+                    : "text-zinc-300 hover:bg-zinc-900/40"
                   }`}
                   onMouseEnter={() => setHoveredId(s.id)}
                   onMouseLeave={() => setHoveredId(null)}
-                  onClick={() => setSelectedId(isSelected ? null : s.id)}
+                  onClick={() => handleRowClick(s.id)}
                 >
-                  {/* SVG spacer */}
                   <div style={{ width: `${spacerWidth}px` }} className="shrink-0 h-full" />
 
-                  {/* Step content */}
                   <div className="flex-1 min-w-0 flex items-center gap-2.5 pr-4">
-                    {/* Step id chip */}
                     <span className="font-mono text-[11px] text-zinc-500 bg-zinc-950 px-1.5 py-0.5 rounded border border-zinc-900/80 shrink-0">
                       {s.id.slice(0, 7)}
                     </span>
-
-                    {/* Type badge */}
                     <StepBadge type={s.step.type} />
-
-                    {/* Node name (workflow mode) */}
-                    {s.step.nodeName && (
-                      <span className="text-[10px] text-zinc-500 font-mono shrink-0">
-                        {s.step.nodeName}
-                      </span>
+                    <span className="font-medium text-zinc-100 text-xs truncate">{s.step.content}</span>
+                    {showLabels && s.step.labels.length > 0 && (
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {s.step.labels.map((lbl, i) => (
+                          <span key={i} className="text-[10px] font-medium px-2 py-0.5 rounded border border-amber-500/20 bg-amber-500/10 text-amber-400 flex items-center gap-1">
+                            <Tag size={9} />
+                            {lbl}
+                          </span>
+                        ))}
+                      </div>
                     )}
-
-                    {/* Step content text */}
-                    <span className="font-medium text-zinc-100 text-xs truncate">
-                      {s.step.content}
-                    </span>
-
-                    {/* Run pill + label pills */}
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {/* Run pill — only on head of run */}
-                      {refs.isHead && (
-                        <span
-                          style={{
-                            borderColor: `${refs.runColor}30`,
-                            color: refs.runColor,
-                            backgroundColor: `${refs.runColor}15`,
-                          }}
-                          className="text-[10px] font-semibold px-2 py-0.5 rounded border flex items-center gap-1"
-                        >
-                          {refs.isCursor ? <Target size={10} className="animate-pulse" /> : <Zap size={10} />}
-                          {refs.runName}
-                        </span>
-                      )}
-                      {/* Label pills */}
-                      {showLabels && stepLabels.map((lbl, i) => (
-                        <span
-                          key={i}
-                          className="text-[10px] font-medium px-2 py-0.5 rounded border border-amber-500/20 bg-amber-500/10 text-amber-400 flex items-center gap-1"
-                        >
-                          <Tag size={9} />
-                          {lbl}
-                        </span>
-                      ))}
-                    </div>
                   </div>
 
-                  {/* Right metadata */}
                   <div className="flex items-center gap-4 shrink-0 text-xs">
                     {s.step.author && (
-                      <span className="text-zinc-500 text-[11px] font-medium hidden sm:inline">
-                        {s.step.author}
-                      </span>
+                      <span className="text-zinc-500 text-[11px] font-medium hidden sm:inline">{s.step.author}</span>
                     )}
                     <span className="text-zinc-600 text-[11px] font-mono whitespace-nowrap">
-                      {new Date(s.step.timestamp).toLocaleDateString([], {
-                        month: "short",
-                        day: "numeric",
-                      })}
+                      {new Date(s.step.timestamp).toLocaleDateString([], { month: "short", day: "numeric" })}
                     </span>
                     <button
                       onClick={(e) => handleCopyId(s.id, e)}
@@ -322,97 +273,109 @@ export const ExecutionCanvas: React.FC<ExecutionCanvasProps> = ({
             exit={{ opacity: 0, y: 15 }}
             className="border-t border-zinc-800 bg-[#0F0F12]/95 p-4 backdrop-blur-md"
           >
-            <div className="max-w-4xl mx-auto flex flex-col md:flex-row gap-6 md:items-center justify-between">
+            <div className="max-w-4xl mx-auto flex flex-col md:flex-row gap-4 md:items-start justify-between">
               {/* Step summary */}
               <div className="flex-1 space-y-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <StepBadge type={state.steps[selectedId].type} />
-                  {state.steps[selectedId].nodeName && (
-                    <span className="text-[10px] text-zinc-500 font-mono">
-                      {state.steps[selectedId].nodeName}
-                    </span>
-                  )}
                   <span className="font-mono text-xs text-zinc-500 bg-zinc-900 px-1.5 py-0.5 rounded">
                     {selectedId}
                   </span>
+                  {(() => {
+                    const run = getStepRun(selectedId);
+                    if (!run) return null;
+                    return (
+                      <span
+                        className="text-[10px] font-semibold px-2 py-0.5 rounded border"
+                        style={{
+                          color: run.color,
+                          borderColor: `${run.color}30`,
+                          backgroundColor: `${run.color}15`,
+                        }}
+                      >
+                        {run.name}
+                      </span>
+                    );
+                  })()}
                 </div>
                 <p className="text-xs text-zinc-200 font-medium truncate">
                   {state.steps[selectedId].content}
                 </p>
-                {state.steps[selectedId].parents.length > 0 && (
-                  <p className="text-[11px] text-zinc-500 font-mono">
-                    Parents: {state.steps[selectedId].parents.join(", ")}
-                  </p>
-                )}
               </div>
 
               {/* Actions */}
-              <div className="flex flex-wrap items-center gap-2.5">
-                {/* Set active run (only when step is the run's head) */}
-                {(() => {
-                  const step = state.steps[selectedId];
-                  const run = state.runs[step?.runId ?? ""];
-                  if (run?.head === selectedId && state.cursor !== step?.runId) {
-                    return (
-                      <button
-                        onClick={handleSetActive}
-                        className="px-3 py-1.5 rounded-lg border border-zinc-700 hover:border-zinc-500 bg-zinc-800 text-xs font-semibold text-zinc-200 transition-all flex items-center gap-1.5"
-                      >
-                        <Target size={13} />
-                        Set Active
-                      </button>
-                    );
-                  }
-                  return null;
-                })()}
-
-                {/* Fork from this step */}
-                <div className="flex items-center gap-1 border border-zinc-800 bg-zinc-950 p-1 rounded-lg">
-                  <input
-                    type="text"
-                    placeholder="run-name"
-                    value={forkName}
-                    onChange={(e) => setForkName(e.target.value)}
-                    className="bg-transparent text-xs px-2 py-1 outline-none text-zinc-200 w-24 border-none"
-                    onKeyDown={(e) => { if (e.key === "Enter" && forkName.trim()) handleFork(); }}
-                  />
-                  <button
-                    onClick={handleFork}
-                    disabled={!forkName.trim()}
-                    className="p-1 px-2 rounded bg-zinc-800 text-zinc-300 hover:text-white disabled:opacity-50 text-xs font-medium flex items-center gap-0.5 transition-colors cursor-pointer"
+              <div className="flex flex-col gap-2">
+                {/* Branch from this step */}
+                {showBranchInput ? (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="text"
+                      placeholder="node-name"
+                      value={branchName}
+                      onChange={(e) => setBranchName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter" && branchName.trim()) handleBranch(); if (e.key === "Escape") setShowBranchInput(false); }}
+                      className="h-8 text-xs w-32 bg-zinc-900 border-zinc-700 text-zinc-200 placeholder:text-zinc-600 focus-visible:ring-zinc-600"
+                      autoFocus
+                    />
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={handleBranch}
+                      disabled={!branchName.trim()}
+                      className="h-8 text-xs"
+                    >
+                      Create
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setShowBranchInput(false)}
+                      className="h-8 text-xs text-zinc-500"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowBranchInput(true)}
+                    className="h-8 text-xs border-zinc-700 text-zinc-300 hover:text-white hover:border-zinc-500 bg-transparent"
                   >
-                    <GitFork size={12} />
-                    Fork
-                  </button>
-                </div>
+                    <GitBranch size={12} />
+                    Branch new node from here
+                  </Button>
+                )}
 
-                {/* Add label to this step */}
-                <div className="flex items-center gap-1 border border-zinc-800 bg-zinc-950 p-1 rounded-lg">
-                  <input
+                {/* Add label */}
+                <div className="flex items-center gap-2">
+                  <Input
                     type="text"
-                    placeholder="label"
+                    placeholder="add label…"
                     value={newLabel}
                     onChange={(e) => setNewLabel(e.target.value)}
-                    className="bg-transparent text-xs px-2 py-1 outline-none text-zinc-200 w-20 border-none"
                     onKeyDown={(e) => { if (e.key === "Enter" && newLabel.trim()) handleAddLabel(); }}
+                    className="h-8 text-xs w-32 bg-zinc-900 border-zinc-700 text-zinc-200 placeholder:text-zinc-600 focus-visible:ring-zinc-600"
                   />
-                  <button
+                  <Button
+                    size="sm"
+                    variant="ghost"
                     onClick={handleAddLabel}
                     disabled={!newLabel.trim()}
-                    className="p-1 px-2 rounded bg-zinc-800 text-zinc-300 hover:text-white disabled:opacity-50 text-xs font-medium flex items-center gap-0.5 transition-colors cursor-pointer"
+                    className="h-8 text-xs text-zinc-400"
                   >
                     <Tag size={12} />
                     Label
-                  </button>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleClosePanel}
+                    className="h-8 w-8 p-0 text-zinc-500"
+                  >
+                    <X size={14} />
+                  </Button>
                 </div>
-
-                {/* Close */}
-                <button
-                  onClick={() => { setSelectedId(null); setForkName(""); setNewLabel(""); }}
-                  className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/30 transition-colors"
-                >
-                  <X size={15} />
-                </button>
               </div>
             </div>
           </motion.div>

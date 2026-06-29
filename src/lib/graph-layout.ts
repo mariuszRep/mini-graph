@@ -1,4 +1,4 @@
-import { ExecutionState, Step, LayoutOptions } from "./types";
+import { ExecutionState, Step, LayoutOptions, Run } from "./types";
 
 export interface RenderStep {
   id: string;
@@ -8,6 +8,7 @@ export interface RenderStep {
   col: number;
   color: string;
   isCursor: boolean;
+  isRunStart: boolean;
   step: Step;
 }
 
@@ -34,6 +35,94 @@ export interface RenderLayout {
   height: number;
 }
 
+/**
+ * Assigns columns to runs based on the parent–child graph formed by parentRunId.
+ *
+ * Key rule: a run that is the sole child of its parent inherits the parent's column
+ * (linear continuation). Only when a parent has 2+ children do extra columns fan out.
+ * Runs with no parentRunId link are treated as roots or orphans and get sequential columns.
+ */
+function assignRunColumns(
+  runs: Record<string, Run>,
+  steps: Record<string, Step>,
+  stepOrder: string[]
+): Record<string, number> {
+  // Build firstStepIndex so we can sort children by insertion order
+  const firstStepIndex: Record<string, number> = {};
+  for (let i = 0; i < stepOrder.length; i++) {
+    const step = steps[stepOrder[i]];
+    if (step && firstStepIndex[step.runId] === undefined) {
+      firstStepIndex[step.runId] = i;
+    }
+  }
+
+  // Build children map: parentRunId → sorted child run IDs
+  const children: Record<string, string[]> = {};
+  const hasParent = new Set<string>();
+
+  for (const run of Object.values(runs)) {
+    if (run.parentRunId && runs[run.parentRunId]) {
+      if (!children[run.parentRunId]) children[run.parentRunId] = [];
+      children[run.parentRunId].push(run.id);
+      hasParent.add(run.id);
+    }
+  }
+
+  // Sort each parent's children by first step insertion order
+  for (const parentId of Object.keys(children)) {
+    children[parentId].sort(
+      (a, b) => (firstStepIndex[a] ?? Infinity) - (firstStepIndex[b] ?? Infinity)
+    );
+  }
+
+  // Find roots: runs with no resolvable parent (prefer "main", then by insertion order)
+  const roots = Object.values(runs)
+    .filter((r) => !hasParent.has(r.id))
+    .sort((a, b) => {
+      if (a.name === "main") return -1;
+      if (b.name === "main") return 1;
+      return (firstStepIndex[a.id] ?? 0) - (firstStepIndex[b.id] ?? 0);
+    });
+
+  const colMap: Record<string, number> = {};
+  let nextFreeCol = 0;
+
+  function visit(runId: string, col: number): void {
+    colMap[runId] = col;
+    if (col >= nextFreeCol) nextFreeCol = col + 1;
+
+    const kids = children[runId] ?? [];
+    if (kids.length === 0) return;
+
+    if (kids.length === 1) {
+      // Linear continuation: sole child inherits this column
+      visit(kids[0], col);
+    } else {
+      // Branching: first child stays in this column (spine), rest fan to new columns
+      visit(kids[0], col);
+      for (let i = 1; i < kids.length; i++) {
+        visit(kids[i], nextFreeCol++);
+      }
+    }
+  }
+
+  for (const root of roots) {
+    if (colMap[root.id] === undefined) {
+      const col = nextFreeCol++;
+      visit(root.id, col);
+    }
+  }
+
+  // Assign any orphaned runs (parentRunId set but not resolvable)
+  for (const run of Object.values(runs)) {
+    if (colMap[run.id] === undefined) {
+      colMap[run.id] = nextFreeCol++;
+    }
+  }
+
+  return colMap;
+}
+
 export function computeLayout(
   state: ExecutionState,
   options: LayoutOptions
@@ -41,32 +130,17 @@ export function computeLayout(
   const { rowHeight, columnWidth, nodeRadius } = options;
   const { stepOrder, steps, runs, cursor } = state;
 
-  // 1. Assign stable columns to runs in order of first appearance
-  const runColumns: Record<string, number> = {};
-  // Primary run (main or first encountered) gets column 0
-  const primaryRunId =
-    Object.values(runs).find((r) => r.name === "main")?.id ??
-    (stepOrder[0] ? steps[stepOrder[0]]?.runId : undefined);
-
-  if (primaryRunId) runColumns[primaryRunId] = 0;
-  let nextCol = primaryRunId !== undefined ? 1 : 0;
-
-  for (const id of stepOrder) {
-    const step = steps[id];
-    if (step && runColumns[step.runId] === undefined) {
-      runColumns[step.runId] = nextCol++;
-    }
-  }
+  // 1. Assign columns using the smart parent–child algorithm
+  const runColumns = assignRunColumns(runs, steps, stepOrder);
 
   // 2. Map steps to row indices (chronological)
   const rowMap: Record<string, number> = {};
   stepOrder.forEach((id, idx) => { rowMap[id] = idx; });
 
   const totalRows = stepOrder.length;
-  const totalCols = Math.max(nextCol, 1);
+  const totalCols = Math.max(Math.max(...Object.values(runColumns), 0) + 1, 1);
 
   const padX = columnWidth * 0.8;
-
   const getX = (col: number) => padX + col * columnWidth;
   const getY = (row: number) => (row + 0.5) * rowHeight;
 
@@ -75,11 +149,14 @@ export function computeLayout(
   const cursorStepId = cursorRun?.head;
 
   // 4. Build render steps
+  const seenRuns = new Set<string>();
   const renderSteps: RenderStep[] = stepOrder.map((id, idx) => {
     const step = steps[id];
     const col = runColumns[step.runId] ?? 0;
     const runColor = runs[step.runId]?.color ?? "#9CA3AF";
     const dotColor = step.typeColor ?? runColor;
+    const isRunStart = !seenRuns.has(step.runId);
+    if (isRunStart) seenRuns.add(step.runId);
 
     return {
       id,
@@ -89,11 +166,12 @@ export function computeLayout(
       y: getY(idx),
       color: dotColor,
       isCursor: id === cursorStepId,
+      isRunStart,
       step,
     };
   });
 
-  // 5. Build render paths (edges between parent → child)
+  // 6. Build render paths (edges between parent → child)
   const renderPaths: RenderPath[] = [];
 
   for (const rs of renderSteps) {
@@ -116,7 +194,6 @@ export function computeLayout(
       const pathId = `${parentId}-${rs.id}-${parentIdx}`;
       const isMergeLine = parentIdx > 0;
 
-      // Edge color flows from the source dot: normal lines use parent's color (incl. typeColor override)
       const parentColor = parentStep.typeColor ?? (runs[parentStep.runId]?.color ?? "#9CA3AF");
       const lineColor = isMergeLine
         ? (runs[parentStep.runId]?.color ?? "#9CA3AF")
@@ -154,7 +231,7 @@ export function computeLayout(
     });
   }
 
-  // 6. Run tip labels
+  // 7. Run tip labels
   const renderRunTags: RenderRunTag[] = [];
 
   for (const run of Object.values(runs)) {

@@ -165,11 +165,13 @@ export function forkRun(
   const color =
     RUN_COLORS[Object.keys(state.runs).length % RUN_COLORS.length];
 
+  const parentRunId = state.steps[fromStepId]?.runId;
+
   const forkStep: Step = {
     id: newStepId,
     parents: [fromStepId],
     type: "generic",
-    content: `Fork: ${newRunName}`,
+    content: `Start of node: ${newRunName}`,
     timestamp: new Date().toISOString(),
     runId: newRunId,
     labels: [],
@@ -180,6 +182,7 @@ export function forkRun(
     name: newRunName,
     color,
     head: newStepId,
+    parentRunId,
   };
 
   return {

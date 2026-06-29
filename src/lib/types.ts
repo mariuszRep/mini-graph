@@ -24,6 +24,7 @@ export interface Run {
   name: string;
   color: string;
   head: string;
+  parentRunId?: string; // UI calls this "Node" — parentRunId tracks which node this branched from
 }
 
 export interface ExecutionState {
@@ -39,6 +40,7 @@ export interface LayoutOptions {
   columnWidth: number;
   nodeRadius: number;
   lineWidth: number;
+  nodeHeaderHeight: number;
   showLabels: boolean;
   showComments: boolean;
   theme: "github" | "minimal";

@@ -7,15 +7,13 @@ import {
   addStep,
   forkRun,
   switchRun,
-  mergeRuns,
   addLabel,
-  deleteRun,
   EXAMPLES,
 } from "./lib/execution-engine";
 import {
   Zap,
   Sparkles,
-  GitFork,
+  Network,
   Copy,
   Check,
 } from "lucide-react";
@@ -37,6 +35,7 @@ export default function App() {
     columnWidth: 16,
     nodeRadius: 4,
     lineWidth: 2,
+    nodeHeaderHeight: 24,
     showLabels: true,
     showComments: true,
     theme: "github",
@@ -60,20 +59,17 @@ export default function App() {
     dispatch(forkRun(state, fromStepId, runName));
   };
 
+  const handleForkFromCurrentHead = (runName: string) => {
+    const head = state.runs[state.cursor]?.head;
+    if (head) dispatch(forkRun(state, head, runName));
+  };
+
   const handleSwitchRun = (runId: string) => {
     dispatch(switchRun(state, runId));
   };
 
-  const handleMergeRuns = (sourceRunId: string) => {
-    dispatch(mergeRuns(state, sourceRunId));
-  };
-
   const handleAddLabel = (label: string, stepId: string) => {
     dispatch(addLabel(state, label, stepId));
-  };
-
-  const handleDeleteRun = (runId: string) => {
-    dispatch(deleteRun(state, runId));
   };
 
   const handleLoadExample = (exampleId: string) => {
@@ -84,7 +80,7 @@ export default function App() {
   const handleReset = () => setState(createInitialState());
 
   const numSteps = Object.keys(state.steps).length;
-  const numRuns = Object.keys(state.runs).length;
+  const numNodes = Object.keys(state.runs).length;
   const activeRun = state.runs[state.cursor];
 
   const installSnippet = "npx shadcn@latest add https://mini-graph.dev/r/execution-graph.json";
@@ -104,7 +100,7 @@ export default function App() {
           {/* Logo + title */}
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-xl bg-gradient-to-br from-indigo-500 to-sky-500 shadow-md shadow-sky-500/10 flex items-center justify-center text-white">
-              <GitFork className="h-5 w-5" />
+              <Network className="h-5 w-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -141,22 +137,22 @@ export default function App() {
               <span className="font-bold text-white">{numSteps}</span>
             </div>
 
-            {/* Runs stat */}
+            {/* Nodes stat */}
             <div className="px-3 py-1.5 rounded-lg bg-zinc-900/80 border border-zinc-800/60 flex items-center gap-2">
               <span className="p-0.5 rounded bg-zinc-800 text-emerald-400">
-                <GitFork size={12} />
+                <Network size={12} />
               </span>
-              <span className="text-zinc-500">Runs:</span>
-              <span className="font-bold text-white">{numRuns}</span>
+              <span className="text-zinc-500">Nodes:</span>
+              <span className="font-bold text-white">{numNodes}</span>
             </div>
 
-            {/* Active run */}
+            {/* Active node */}
             <div className="px-3 py-1.5 rounded-lg bg-zinc-900/80 border border-zinc-800/60 flex items-center gap-2">
               <span
-                className="w-2.5 h-2.5 rounded-full shrink-0"
+                className="w-2.5 h-2.5 rounded-full shrink-0 animate-pulse"
                 style={{ backgroundColor: activeRun?.color ?? "#9CA3AF" }}
               />
-              <span className="text-zinc-500">Active:</span>
+              <span className="text-zinc-500">Node:</span>
               <span className="font-bold" style={{ color: activeRun?.color ?? "#9CA3AF" }}>
                 {activeRun?.name ?? "—"}
               </span>
@@ -174,10 +170,7 @@ export default function App() {
             options={layoutOptions}
             onOptionsChange={setLayoutOptions}
             onAddStep={handleAddStep}
-            onForkRun={handleForkRun}
-            onSwitchRun={handleSwitchRun}
-            onMergeRuns={handleMergeRuns}
-            onDeleteRun={handleDeleteRun}
+            onForkFromCurrentHead={handleForkFromCurrentHead}
             onLoadExample={handleLoadExample}
             onReset={handleReset}
           />
